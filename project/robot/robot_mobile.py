@@ -15,3 +15,13 @@ class RobotMobile:
 
     def tourner(self, pangle):
         self.orientation = self.orientation+pangle/2*math.pi
+
+    # Getter : Permet d'acceder a l'attribut depuis l'exterieur de la classe.
+    @property
+    def get_x(self) -> float:
+        return self.x
+
+    # Setter : Permet la modification de l'attribut depuis l'exterieur de la classe.
+    @get_x.setter
+    def get_x(self, value: float):
+        self.x = value
