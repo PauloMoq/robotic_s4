@@ -1,0 +1,16 @@
+# On bloque tout par défaut
+*
+
+# On autorise les dossiers
+!*/
+
+# On autorise uniquement les fichiers .py et .md
+!*.py
+!*.md
+
+# On autorise le fichier .gitignore lui-même
+!.gitignore
+
+# On bloque explicitement les fichiers temporaires Python qui se créent tout seuls
+**/__pycache__/
+*.pyc
