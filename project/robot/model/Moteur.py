@@ -2,7 +2,6 @@ from abc import ABC, abstractmethod
 import math
 
 class Moteur(ABC):
-
     @abstractmethod
     def commander(self, *args, **kwargs):
         pass
@@ -10,7 +9,6 @@ class Moteur(ABC):
     @abstractmethod
     def mettre_a_jour(self, robot, dt: float):
         pass
-
 
 class MoteurDifferentiel(Moteur):
     def __init__(self, v: float = 0.0, omega: float = 0.0):
