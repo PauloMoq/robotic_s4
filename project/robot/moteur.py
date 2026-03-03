@@ -27,6 +27,9 @@ class MoteurDifferentiel(Moteur):
         robot.x = robot.x + self.v * math.cos(theta) * dt
         robot.y = robot.y + self.v * math.sin(theta) * dt
 
+    def __str__(self):
+        return "Différentiel"
+
 class MoteurOmnidirectionnel(Moteur):
     def __init__(self, vx: float = 0.0, vy: float = 0.0, omega: float = 0.0):
         self.vx = vx
@@ -43,3 +46,6 @@ class MoteurOmnidirectionnel(Moteur):
         robot.orientation = theta + self.omega * dt
         robot.x = robot.x + (self.vx * math.cos(theta) - self.vy * math.sin(theta)) * dt
         robot.y = robot.y + (self.vx * math.sin(theta) + self.vy * math.cos(theta)) * dt
+
+    def __str__(self):
+        return "Omnidirectionnel"

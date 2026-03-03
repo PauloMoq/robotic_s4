@@ -1,6 +1,6 @@
 import math
 from typing import Optional
-from robot.moteur import Moteur
+from moteur import Moteur
 
 class RobotMobile:
 
@@ -60,7 +60,7 @@ class RobotMobile:
             self.moteur.mettre_a_jour(self, dt)
 
     def __str__(self):
-        return f"(x={self.x:.2f}, y={self.y:.2f}, orientation={self.orientation:.2f}, moteur={self.moteur})"
+        return f"Robot -> x={self.x:.2f}, y={self.y:.2f}, orientation={self.orientation:.2f}, moteur={self.moteur}"
 
     @staticmethod
     def moteur_valide(moteur) -> bool:
