@@ -11,12 +11,15 @@ class VuePygame:
         pygame.display.set_caption("Simulation Robot Mobile")
         self.clock = pygame.time.Clock()
 
-        #couleurs
-        self.COLOR_BG = (30, 33, 36)  #gris très foncé
-        self.COLOR_GRID = (50, 55, 60)  #grille subtile
-        self.COLOR_ROBOT = (0, 150, 255)  #bleu clair
-        self.COLOR_DIR = (255, 80, 80)  #rouge doux
-        self.COLOR_BORDER = (100, 100, 100)  #bordure de map
+        # Couleurs
+        self.COLOR_BG       = (30, 33, 36)    # gris très foncé
+        self.COLOR_GRID     = (50, 55, 60)    # grille subtile
+        self.COLOR_ROBOT    = (0, 150, 255)   # bleu clair
+        self.COLOR_DIR      = (255, 80, 80)   # rouge doux
+        self.COLOR_BORDER   = (100, 100, 100) # bordure de map
+        self.COLOR_MUR      = (180, 170, 140) # beige/sable pour les murs
+        self.COLOR_MUR_BORD = (220, 210, 180) # contour mur
+        self.COLOR_ARRIVEE  = (50, 220, 100)  # vert vif pour l'arrivée
 
     def convertir_coordonnees(self, x, y):
         px = int(self.largeur / 2 + (x * self.scale))
@@ -44,9 +47,92 @@ class VuePygame:
         for obs in env.obstacles:
             px, py = self.convertir_coordonnees(obs["x"], obs["y"])
             r_px = int(obs["rayon"] * self.scale)
-
             pygame.draw.circle(self.screen, (200, 50, 50), (px, py), r_px)
             pygame.draw.circle(self.screen, (255, 255, 255), (px, py), r_px, 1)
+
+    def dessiner_murs(self, env):
+        """Dessine les murs. Pour les murs très fins (<4px) on force 2px min
+        afin qu ils restent visibles, coins arrondis uniquement si assez epais."""
+        for mur in env.murs:
+            px, py = self.convertir_coordonnees(mur["x"], mur["y"] + mur["h"])
+            pw = max(2, int(mur["w"] * self.scale))
+            ph = max(2, int(mur["h"] * self.scale))
+            rect = pygame.Rect(px, py, pw, ph)
+            rayon_coin = min(3, pw // 2, ph // 2) if min(pw, ph) >= 6 else 0
+            pygame.draw.rect(self.screen, self.COLOR_MUR, rect, border_radius=rayon_coin)
+            if min(pw, ph) >= 4:
+                pygame.draw.rect(self.screen, self.COLOR_MUR_BORD, rect, 1, border_radius=rayon_coin)
+
+    def dessiner_arrivee(self, env):
+        """Dessine le point d'arrivée avec un effet de halo animé."""
+        if env.arrivee is None:
+            return
+        px, py = self.convertir_coordonnees(env.arrivee["x"], env.arrivee["y"])
+        r_px = int(env.arrivee["rayon"] * self.scale)
+
+        # Halo transparent
+        halo = pygame.Surface((r_px * 4, r_px * 4), pygame.SRCALPHA)
+        pygame.draw.circle(halo, (50, 220, 100, 60), (r_px * 2, r_px * 2), r_px * 2)
+        self.screen.blit(halo, (px - r_px * 2, py - r_px * 2))
+
+        # Cercle plein
+        pygame.draw.circle(self.screen, self.COLOR_ARRIVEE, (px, py), r_px)
+        pygame.draw.circle(self.screen, (255, 255, 255), (px, py), r_px, 2)
+
+        # Lettre "A" au centre
+        font = pygame.font.SysFont("monospace", r_px, bold=True)
+        texte = font.render("A", True, (255, 255, 255))
+        self.screen.blit(texte, texte.get_rect(center=(px, py)))
+
+    def afficher_victoire(self):
+        """Affiche un message de victoire centré à l'écran."""
+        overlay = pygame.Surface((self.largeur, self.hauteur), pygame.SRCALPHA)
+        overlay.fill((0, 0, 0, 150))
+        self.screen.blit(overlay, (0, 0))
+
+        font_grande = pygame.font.SysFont("monospace", 64, bold=True)
+        font_petite = pygame.font.SysFont("monospace", 28)
+
+        texte1 = font_grande.render("ARRIVÉE !", True, (50, 220, 100))
+        texte2 = font_petite.render("Appuie sur ECHAP pour quitter", True, (200, 200, 200))
+
+        self.screen.blit(texte1, texte1.get_rect(center=(self.largeur // 2, self.hauteur // 2 - 40)))
+        self.screen.blit(texte2, texte2.get_rect(center=(self.largeur // 2, self.hauteur // 2 + 40)))
+
+
+
+    def dessiner_chemin(self, controleur_auto):
+        """Dessine le chemin BFS restant sous forme de ligne pointillée verte."""
+        points = controleur_auto.chemin_restant
+        if len(points) < 2:
+            return
+        pixels = [self.convertir_coordonnees(x, y) for (x, y) in points]
+        for i in range(len(pixels) - 1):
+            pygame.draw.line(self.screen, (50, 200, 80), pixels[i], pixels[i+1], 1)
+        for px, py in pixels:
+            pygame.draw.circle(self.screen, (50, 200, 80), (px, py), 3)
+
+    def dessiner_lidar(self, robot, lidar):
+        """
+        Dessine les rayons lidar depuis le robot jusqu au point d impact.
+          - Rayon : ligne jaune semi-transparente
+          - Impact : petit cercle rouge au point de contact
+        """
+        if not lidar.mesures:
+            return
+
+        ox, oy = self.convertir_coordonnees(robot.x, robot.y)
+
+        for (angle, dist, xi, yi) in lidar.mesures:
+            px, py = self.convertir_coordonnees(xi, yi)
+
+            # Rayon semi-transparent
+            surf = pygame.Surface((self.largeur, self.hauteur), pygame.SRCALPHA)
+            pygame.draw.line(surf, (255, 220, 50, 60), (ox, oy), (px, py), 1)
+            self.screen.blit(surf, (0, 0))
+
+            # Point d impact
+            pygame.draw.circle(self.screen, (255, 80, 80), (px, py), 3)
 
     def tick(self, fps=60):
         self.clock.tick(fps)

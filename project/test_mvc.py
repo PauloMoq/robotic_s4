@@ -19,7 +19,7 @@ def main():
                             {"x": -4.0, "y": -1.0, "rayon": 1.2},
                             {"x": 0.0, "y": 4.0, "rayon": 0.5}
                         ])
-    robot = RobotMobile(moteur=MoteurOmnidirectionnel())
+    robot = RobotMobile(moteur=MoteurDifferentiel())
     vue = VuePygame()
     controleur = ControleurPygame(robot)
 
