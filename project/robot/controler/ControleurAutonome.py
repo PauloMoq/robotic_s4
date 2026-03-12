@@ -43,6 +43,9 @@ class ControleurAutonome:
         self.omega_max     = omega_max
         self.seuil_urgence = seuil_urgence
 
+        self.rc_depart  = rc_depart
+        self.rc_arrivee = rc_arrivee
+
         # Calculer le chemin BFS
         self.chemin_cellules = self._bfs(rc_depart, rc_arrivee)  # [(r,c), ...]
         self.chemin_monde    = [self._centre(r, c) for (r, c) in self.chemin_cellules]
@@ -102,45 +105,91 @@ class ControleurAutonome:
     def calculer_commande(self):
         """Retourne {"vx", "vy", "omega"} pour MoteurOmnidirectionnel."""
 
-        # Plus de waypoints → arrivée atteinte, s'arrêter
-        if self.idx_waypoint >= len(self.chemin_monde):
+        if not self.chemin_monde:
             return {"vx": 0.0, "vy": 0.0, "omega": 0.0}
+
+        # Avancer l'index tant que le waypoint courant est atteint
+        # (sauf pour le dernier — on continue d'avancer vers lui jusqu'à collecte)
+        while self.idx_waypoint < len(self.chemin_monde) - 1:
+            wx, wy = self.chemin_monde[self.idx_waypoint]
+            dist = math.hypot(self.robot.x - wx, self.robot.y - wy)
+            if dist < self.cell * 0.3:
+                self.idx_waypoint += 1
+            else:
+                break
 
         wx, wy = self.chemin_monde[self.idx_waypoint]
         dx = wx - self.robot.x
         dy = wy - self.robot.y
-        dist_wp = math.sqrt(dx*dx + dy*dy)
+        dist_wp = math.hypot(dx, dy)
 
-        # Waypoint atteint → passer au suivant
-        if dist_wp < self.cell * 0.25:
-            self.idx_waypoint += 1
-            if self.idx_waypoint >= len(self.chemin_monde):
-                return {"vx": 0.0, "vy": 0.0, "omega": 0.0}
-            wx, wy = self.chemin_monde[self.idx_waypoint]
-            dx = wx - self.robot.x
-            dy = wy - self.robot.y
-            dist_wp = math.sqrt(dx*dx + dy*dy)
+        # Trop proche du dernier waypoint → s'arrêter (collecte gérée par test_oeufs)
+        if dist_wp < 0.05:
+            return {"vx": 0.0, "vy": 0.0, "omega": 0.0}
 
-        # Angle vers le waypoint
+        # Vecteur normalisé vers le waypoint (coordonnées monde)
+        nx = dx / dist_wp
+        ny = dy / dist_wp
+
+        # Projection dans le repère robot
+        theta = self.robot.orientation
+        vx_robot =  nx * math.cos(theta) + ny * math.sin(theta)
+        vy_robot = -nx * math.sin(theta) + ny * math.cos(theta)
+
+        vx = self.v_max * vx_robot
+        vy = self.v_max * vy_robot
+
+        # Rotation douce vers la cible
         angle_cible = math.atan2(dy, dx)
-        delta       = self._norm_angle(angle_cible - self.robot.orientation)
+        delta = self._norm_angle(angle_cible - theta)
+        omega = max(-self.omega_max, min(self.omega_max, 2.0 * delta))
 
-        # Rotation proportionnelle
-        omega = max(-self.omega_max, min(self.omega_max, 3.0 * delta))
-
-        # Vitesse : pleine si bien aligné, réduite sinon
-        alignement = max(0.0, 1.0 - abs(delta) / (math.pi / 4))
-        vx = self.v_max * alignement
-
-        # Sécurité lidar : freinage d'urgence si obstacle très proche
-        if self.lidar.mesures:
-            dist_avant = self.lidar.mesures[0][1]
-            if dist_avant < self.seuil_urgence:
-                vx = 0.0
-
-        return {"vx": vx, "vy": 0.0, "omega": omega}
+        return {"vx": vx, "vy": vy, "omega": omega}
 
     @property
     def chemin_restant(self):
         """Retourne les waypoints monde non encore atteints (pour affichage)."""
         return self.chemin_monde[self.idx_waypoint:]
+
+    def _recalculer_chemin(self):
+        """Recalcule le chemin BFS vers rc_arrivee depuis la position actuelle du robot."""
+        c_cur = round((self.robot.x - self.x0 - self.cell / 2) / self.cell)
+        r_cur = self.rows - 1 - round((self.robot.y - self.y0 - self.cell / 2) / self.cell)
+        c_cur = max(0, min(self.cols - 1, c_cur))
+        r_cur = max(0, min(self.rows - 1, r_cur))
+        self.chemin_cellules = self._bfs((r_cur, c_cur), self.rc_arrivee)
+        self.chemin_monde    = [self._centre(r, c) for (r, c) in self.chemin_cellules]
+        self.idx_waypoint    = 0
+
+
+# ── Fonctions utilitaires (hors classe) ─────────────────────────────────────
+
+def trouver_oeuf_cible(robot, lidar, oeufs, env):
+    """
+    Parcourt les mesures LIDAR. Si un rayon percute un œuf non collecté
+    (point d'impact proche du centre de l'œuf), retourne cet œuf.
+    Sinon retourne l'œuf non collecté le plus proche (fallback).
+    """
+    for (angle, dist, xi, yi) in lidar.mesures:
+        for oeuf in oeufs:
+            if oeuf["collecte"]:
+                continue
+            dist_impact = math.hypot(xi - oeuf["x"], yi - oeuf["y"])
+            if dist_impact < oeuf["rayon"] + 0.25:
+                return oeuf
+
+    non_collectes = [o for o in oeufs if not o["collecte"]]
+    if not non_collectes:
+        return None
+    return min(non_collectes,
+               key=lambda o: math.hypot(robot.x - o["x"], robot.y - o["y"]))
+
+
+def verifier_collecte(robot, oeufs, rayon_collecte=0.45):
+    """Marque un œuf comme collecté si le robot est assez proche."""
+    for oeuf in oeufs:
+        if not oeuf["collecte"]:
+            d = math.hypot(robot.x - oeuf["x"], robot.y - oeuf["y"])
+            if d < rayon_collecte:
+                oeuf["collecte"] = True
+                print(f"🥚 Œuf collecté en ({oeuf['x']:.1f}, {oeuf['y']:.1f}) !")

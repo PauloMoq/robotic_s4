@@ -136,3 +136,55 @@ class VuePygame:
 
     def tick(self, fps=60):
         self.clock.tick(fps)
+
+    # ── Dessin des œufs ──────────────────────────────────────────────────────
+    def dessiner_oeufs(self, oeufs, rayon_oeuf=0.18):
+        """Dessine les œufs restants sous forme d'ellipse jaune/blanche."""
+        for oeuf in oeufs:
+            if oeuf["collecte"]:
+                continue
+            px, py = self.convertir_coordonnees(oeuf["x"], oeuf["y"])
+            rw = int(rayon_oeuf * self.scale * 1.1)
+            rh = int(rayon_oeuf * self.scale * 1.5)
+            rect = pygame.Rect(px - rw, py - rh, rw * 2, rh * 2)
+            pygame.draw.ellipse(self.screen, (255, 230, 60), rect)
+            pygame.draw.ellipse(self.screen, (255, 255, 255), rect, 2)
+
+    def dessiner_compteur_oeufs(self, oeufs, nb_total):
+        """Affiche le compteur d'œufs restants en haut à gauche."""
+        restants = sum(1 for o in oeufs if not o["collecte"])
+        font = pygame.font.SysFont("monospace", 26, bold=True)
+        texte = font.render(f"Oeufs restants : {restants} / {nb_total}", True, (255, 230, 60))
+        self.screen.blit(texte, (20, 16))
+
+    def dessiner_timer(self, timer):
+        """Affiche le timer en haut à droite."""
+        minutes = int(timer) // 60
+        secondes = int(timer) % 60
+        centimes = int((timer % 1) * 100)
+        texte_timer = f"{minutes:02d}:{secondes:02d}.{centimes:02d}"
+        font = pygame.font.SysFont("monospace", 26, bold=True)
+        surf = font.render(texte_timer, True, (200, 200, 200))
+        self.screen.blit(surf, (self.largeur - surf.get_width() - 20, 16))
+
+    def afficher_victoire_oeufs(self, timer=None):
+        """Overlay de victoire pour la chasse aux œufs."""
+        overlay = pygame.Surface((self.largeur, self.hauteur), pygame.SRCALPHA)
+        overlay.fill((0, 0, 0, 160))
+        self.screen.blit(overlay, (0, 0))
+
+        font_big   = pygame.font.SysFont("monospace", 64, bold=True)
+        font_small = pygame.font.SysFont("monospace", 28)
+
+        t1 = font_big.render("Tous les oeufs sont récupérés !", True, (255, 230, 60))
+        self.screen.blit(t1, (self.largeur // 2 - t1.get_width() // 2, self.hauteur // 2 - 80))
+
+        if timer is not None:
+            minutes = int(timer) // 60
+            secondes = int(timer) % 60
+            centimes = int((timer % 1) * 100)
+            t2 = font_small.render(f"Temps : {minutes:02d}:{secondes:02d}.{centimes:02d}", True, (255, 255, 255))
+            self.screen.blit(t2, (self.largeur // 2 - t2.get_width() // 2, self.hauteur // 2 + 10))
+
+        t3 = font_small.render("Appuyez sur ECHAP pour quitter", True, (160, 160, 160))
+        self.screen.blit(t3, (self.largeur // 2 - t3.get_width() // 2, self.hauteur // 2 + 60))

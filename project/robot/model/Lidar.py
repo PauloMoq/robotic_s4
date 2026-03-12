@@ -110,4 +110,12 @@ class Lidar:
                     xi_min   = ox + dx * t
                     yi_min   = oy + dy * t
 
+            # Tester les collectables (œufs) — détectables par LIDAR, pas de collision physique
+            for col in getattr(env, 'collectables', []):
+                t = self._intersect_cercle(ox, oy, dx, dy, col)
+                if t is not None and t < dist_min:
+                    dist_min = t
+                    xi_min   = ox + dx * t
+                    yi_min   = oy + dy * t
+
             self.mesures.append((angle, dist_min, xi_min, yi_min))
