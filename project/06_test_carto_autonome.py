@@ -384,6 +384,96 @@ class ControleurExploration:
         return self._etat
 
 
+# ── Vue étendue pour le 06 ───────────────────────────────────────────────────
+
+class VuePygame06(VuePygame):
+    """Étend VuePygame avec progression inline, overlay pause et panneau de contrôles."""
+
+    def dessiner_hud(self, oeufs, nb_total, carto):
+        """
+        Affiche sur une seule ligne en haut à gauche :
+          🥚 Oeufs : X / N      Carte : XX %
+        """
+        font = pygame.font.SysFont("monospace", 26, bold=True)
+
+        restants = sum(1 for o in oeufs if not o["collecte"])
+        surf_oeufs = font.render(f"Oeufs : {restants} / {nb_total}", True, (255, 230, 60))
+        self.screen.blit(surf_oeufs, (20, 16))
+
+        total       = carto.rows * carto.cols
+        decouvertes = carto.nb_cellules_decouvertes()
+        pct         = decouvertes * 100 // total
+        surf_carte  = font.render(f"Carte : {pct} %", True, (120, 200, 255))
+        # Aligné juste après le compteur d'œufs avec un petit écart
+        x_carte = 20 + surf_oeufs.get_width() + 40
+        self.screen.blit(surf_carte, (x_carte, 16))
+
+    def dessiner_controles(self, mode_auto, en_pause):
+        """
+        Panneau des touches en bas à droite, toujours visible.
+        """
+        lignes = [
+            ("ESPACE",  "Pause / Reprendre"),
+            ("TAB",     "Auto / Manuel"),
+            ("R",       "Regenerer"),
+            ("ECHAP",   "Quitter"),
+            ("",        ""),
+            ("↑ ↓ ← →", "Deplacer (manuel)"),
+            ("Q / D",   "Rotation (manuel)"),
+        ]
+
+        font_titre = pygame.font.SysFont("monospace", 18, bold=True)
+        font_ligne = pygame.font.SysFont("monospace", 17)
+        PAD        = 12
+        LIGNE_H    = 22
+        LARGEUR    = 280
+
+        hauteur_bloc = PAD * 2 + font_titre.get_height() + 6 + len(lignes) * LIGNE_H
+        x0 = self.largeur - LARGEUR - 16
+        y0 = self.hauteur - hauteur_bloc - 16
+
+        # Fond semi-transparent
+        fond = pygame.Surface((LARGEUR, hauteur_bloc), pygame.SRCALPHA)
+        fond.fill((0, 0, 0, 140))
+        self.screen.blit(fond, (x0, y0))
+        pygame.draw.rect(self.screen, (80, 80, 100),
+                         pygame.Rect(x0, y0, LARGEUR, hauteur_bloc), 1)
+
+        # Titre
+        titre = font_titre.render("CONTROLES", True, (200, 200, 220))
+        self.screen.blit(titre, (x0 + PAD, y0 + PAD))
+        y = y0 + PAD + titre.get_height() + 6
+
+        # Lignes touche / action
+        for touche, action in lignes:
+            if touche == "":
+                y += LIGNE_H // 2
+                continue
+            s_touche = font_ligne.render(touche, True, (255, 220, 80))
+            s_action = font_ligne.render(action, True, (180, 180, 180))
+            self.screen.blit(s_touche, (x0 + PAD, y))
+            self.screen.blit(s_action, (x0 + PAD + 90, y))
+            y += LIGNE_H
+
+    def dessiner_progression(self, carto):
+        pass  # remplacé par dessiner_hud
+
+    def afficher_pause(self):
+        """Overlay semi-transparent avec le texte PAUSE centré."""
+        overlay = pygame.Surface((self.largeur, self.hauteur), pygame.SRCALPHA)
+        overlay.fill((0, 0, 0, 120))
+        self.screen.blit(overlay, (0, 0))
+
+        font_big   = pygame.font.SysFont("monospace", 72, bold=True)
+        font_small = pygame.font.SysFont("monospace", 26)
+
+        t1 = font_big.render("PAUSE", True, (255, 255, 255))
+        t2 = font_small.render("ESPACE pour reprendre", True, (180, 180, 180))
+
+        self.screen.blit(t1, t1.get_rect(center=(self.largeur // 2, self.hauteur // 2 - 40)))
+        self.screen.blit(t2, t2.get_rect(center=(self.largeur // 2, self.hauteur // 2 + 40)))
+
+
 # ── Main ─────────────────────────────────────────────────────────────────────
 
 def main():
@@ -404,7 +494,7 @@ def main():
     )
 
     robot             = RobotMobile(x=x_dep, y=y_dep, moteur=MoteurOmnidirectionnel())
-    vue               = VuePygame(largeur=WIN_W, hauteur=WIN_H, scale=SCALE)
+    vue               = VuePygame06(largeur=WIN_W, hauteur=WIN_H, scale=SCALE)
     lidar             = Lidar(nb_rayons=16, portee=3.5, pas=0.02)
     carto             = Cartographie(ROWS, COLS, CELL, X0, Y0, passages=passages)
     controleur_manuel = ControleurPygame(robot)
@@ -422,6 +512,7 @@ def main():
     )
 
     mode_auto = True
+    en_pause  = False
     clock     = pygame.time.Clock()
     victoire  = False
     running   = True
@@ -432,7 +523,7 @@ def main():
     print("=== Cartographie Autonome — Robot LIDAR ===")
     print(f"Grille {COLS}×{ROWS}, {NB_OEUFS} œufs cachés")
     print(f"Départ robot : cellule ({r_dep},{c_dep})")
-    print("TAB : auto/manuel  |  R : régénérer  |  ECHAP : quitter")
+    print("TAB : auto/manuel  |  ESPACE : pause  |  R : régénérer  |  ECHAP : quitter")
 
     try:
         while running:
@@ -442,6 +533,10 @@ def main():
                 if event.type == pygame.KEYDOWN:
                     if event.key == pygame.K_ESCAPE:
                         running = False
+                    if event.key == pygame.K_SPACE:
+                        if not victoire:
+                            en_pause = not en_pause
+                            print(f"{'PAUSE' if en_pause else 'REPRISE'}")
                     if event.key == pygame.K_TAB:
                         mode_auto = not mode_auto
                         print(f"Mode : {'AUTONOME' if mode_auto else 'MANUEL'}")
@@ -454,7 +549,7 @@ def main():
 
             dt = clock.tick(60) / 1000.0
 
-            if not victoire:
+            if not victoire and not en_pause:
                 timer += dt
 
                 # 1. Commande
@@ -498,12 +593,17 @@ def main():
             vue.dessiner_lidar(robot, lidar)
             vue.dessiner_oeufs_detectes(carto)
             vue.dessiner_robot(robot)
-            vue.dessiner_compteur_oeufs(oeufs, NB_OEUFS)
+            vue.dessiner_hud(oeufs, NB_OEUFS, carto)
             vue.dessiner_timer(timer)
             vue.dessiner_etat_exploration(controleur_auto)
+            vue.dessiner_controles(mode_auto, en_pause)
+
+            if en_pause and not victoire:
+                vue.afficher_pause()
 
             if victoire:
                 vue.afficher_victoire_oeufs(timer)
+                vue.dessiner_controles(mode_auto, en_pause)
 
             pygame.display.flip()
 
