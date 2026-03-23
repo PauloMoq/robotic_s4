@@ -231,21 +231,53 @@ class VuePygame:
 
     def dessiner_cartographie(self, carto):
         """
-        Recouvre d'un voile noir opaque toutes les cellules non encore découvertes.
-        À appeler APRÈS avoir dessiné les murs, AVANT le robot.
+        Rendu fog-of-war propre :
+          - Cellule non découverte  → carré noir plein
+          - Cellule découverte      → fond gris foncé + murs sur les arêtes sans passage
+
+        Remplace dessiner_murs() pour le mode 05 : n'appelle PAS dessiner_murs(env)
+        dans la boucle principale, seulement dessiner_cartographie(carto).
         """
-        taille_px = int(carto.cell * self.scale) + 1  # +1 pour éviter les gaps
+        taille_px = int(carto.cell * self.scale) + 1
+        ep_mur    = max(5, int(self.scale * 0.18))   # ~9px pour scale=50 — bien visible
+        COLOR_FOG   = (0, 0, 0)
+        COLOR_CELL  = (42, 46, 50)
+        COLOR_MUR   = (200, 185, 140)                # beige chaud
+        COLOR_MUR_B = (255, 240, 180)                # contour clair
 
         for r in range(carto.rows):
             for c in range(carto.cols):
+                x_monde = carto.x0 + c * carto.cell
+                y_monde = carto.y0 + (carto.rows - 1 - r) * carto.cell
+                px, py  = self.convertir_coordonnees(x_monde, y_monde + carto.cell)
+                rect    = pygame.Rect(px, py, taille_px, taille_px)
+
                 if not carto.est_decouverte(r, c):
-                    # Coin bas-gauche de la cellule en monde
-                    x_monde = carto.x0 + c * carto.cell
-                    y_monde = carto.y0 + (carto.rows - 1 - r) * carto.cell
-                    # Coin haut-gauche en pixels (y_monde + cell = coin haut)
-                    px, py = self.convertir_coordonnees(x_monde, y_monde + carto.cell)
-                    rect = pygame.Rect(px, py, taille_px, taille_px)
-                    pygame.draw.rect(self.screen, (0, 0, 0), rect)
+                    pygame.draw.rect(self.screen, COLOR_FOG, rect)
+                    continue
+
+                # Fond cellule découverte
+                pygame.draw.rect(self.screen, COLOR_CELL, rect)
+
+                # Bordure de mur sur chaque arête sans passage — dessinée
+                # À L'INTÉRIEUR de la cellule découverte, côté mur.
+                for vr, vc, cote in [(r-1,c,"haut"),(r+1,c,"bas"),(r,c-1,"gauche"),(r,c+1,"droite")]:
+                    hors_grille = not (0 <= vr < carto.rows and 0 <= vc < carto.cols)
+                    cle = (min((r,c),(vr,vc)), max((r,c),(vr,vc)))
+                    est_mur = hors_grille or (cle not in carto.passages)
+                    if not est_mur:
+                        continue
+                    # Bande colorée sur le bord intérieur de la cellule courante
+                    if cote == "haut":
+                        mr = pygame.Rect(px, py, taille_px, ep_mur)
+                    elif cote == "bas":
+                        mr = pygame.Rect(px, py + taille_px - ep_mur, taille_px, ep_mur)
+                    elif cote == "gauche":
+                        mr = pygame.Rect(px, py, ep_mur, taille_px)
+                    else:
+                        mr = pygame.Rect(px + taille_px - ep_mur, py, ep_mur, taille_px)
+                    pygame.draw.rect(self.screen, COLOR_MUR,   mr)
+                    pygame.draw.rect(self.screen, COLOR_MUR_B, mr, 1)
 
     def dessiner_oeufs_detectes(self, carto, rayon_oeuf=0.18):
         """

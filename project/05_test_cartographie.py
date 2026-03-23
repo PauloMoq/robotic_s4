@@ -125,40 +125,7 @@ def placer_oeufs(nb, cellule_exclue):
             for cx, cy in [centre_cellule_monde(r, c)]]
 
 
-# ── Patch VuePygame — méthodes de cartographie ──────────────────────────────
-# On ajoute les méthodes directement sur la classe pour ne pas modifier
-# le fichier source original.
-
-def _dessiner_cartographie(self, carto):
-    """
-    Recouvre d'un voile noir opaque toutes les cellules non encore découvertes.
-    À appeler APRÈS avoir dessiné les murs, AVANT le robot.
-    """
-    taille_px = int(carto.cell * self.scale) + 1
-
-    for r in range(carto.rows):
-        for c in range(carto.cols):
-            if not carto.est_decouverte(r, c):
-                x_monde = carto.x0 + c * carto.cell
-                y_monde = carto.y0 + (carto.rows - 1 - r) * carto.cell
-                px, py  = self.convertir_coordonnees(x_monde, y_monde + carto.cell)
-                rect    = pygame.Rect(px, py, taille_px, taille_px)
-                pygame.draw.rect(self.screen, (0, 0, 0), rect)
-
-def _dessiner_oeufs_detectes(self, carto, rayon_oeuf=0.18):
-    """Affiche uniquement les œufs que le LIDAR a déjà repérés."""
-    for oeuf in carto.oeufs_detectes:
-        if oeuf.get("collecte"):
-            continue
-        px, py = self.convertir_coordonnees(oeuf["x"], oeuf["y"])
-        rw = int(rayon_oeuf * self.scale * 1.1)
-        rh = int(rayon_oeuf * self.scale * 1.5)
-        rect = pygame.Rect(px - rw, py - rh, rw * 2, rh * 2)
-        pygame.draw.ellipse(self.screen, (255, 230, 60), rect)
-        pygame.draw.ellipse(self.screen, (255, 255, 255), rect, 2)
-
-VuePygame.dessiner_cartographie    = _dessiner_cartographie
-VuePygame.dessiner_oeufs_detectes  = _dessiner_oeufs_detectes
+# Les méthodes dessiner_cartographie et dessiner_oeufs_detectes sont dans VuePygame directement.
 
 
 # ── Main ────────────────────────────────────────────────────────────────────
@@ -183,7 +150,7 @@ def main():
     robot      = RobotMobile(x=x_dep, y=y_dep, moteur=MoteurOmnidirectionnel())
     vue        = VuePygame(largeur=WIN_W, hauteur=WIN_H, scale=SCALE)
     lidar      = Lidar(nb_rayons=16, portee=3.5, pas=0.02)
-    carto      = Cartographie(ROWS, COLS, CELL, X0, Y0)
+    carto      = Cartographie(ROWS, COLS, CELL, X0, Y0, passages=passages)
     controleur = ControleurPygame(robot)
 
     clock    = pygame.time.Clock()
@@ -246,8 +213,7 @@ def main():
             # ── Rendu ────────────────────────────────────────────────────────
             vue.screen.fill(vue.COLOR_BG)
             vue.dessiner_grille()
-            vue.dessiner_murs(env)              # murs réels (toujours là physiquement)
-            vue.dessiner_cartographie(carto)    # voile noir sur non découvert
+            vue.dessiner_cartographie(carto)    # fond + murs découverts + fog
             vue.dessiner_lidar(robot, lidar)    # rayons LIDAR
             vue.dessiner_oeufs_detectes(carto)  # œufs visibles seulement si détectés
             vue.dessiner_robot(robot)

@@ -4,38 +4,25 @@ import math
 class Cartographie:
     """
     Carte progressive construite par le LIDAR.
-
-    Grille de cellules (rows × cols) identiques à celles du labyrinthe.
-    Pour chaque cellule on stocke :
-      - decouverte   : True si le LIDAR a éclairé cette cellule
-      - passages     : set de voisins (r,c) accessibles détectés
-      - oeufs_detectes : liste de dicts {"x","y","rayon","collecte"}
-
-    Convention de coordonnées identique au reste du projet :
-      cellule (r, c)  →  coin bas-gauche monde : (x0 + c*cell, y0 + (rows-1-r)*cell)
+    Utilise le graphe `passages` du labyrinthe pour bloquer
+    strictement la vision au niveau des murs.
     """
 
-    def __init__(self, rows, cols, cell_size, x0, y0):
-        self.rows      = rows
-        self.cols      = cols
-        self.cell      = cell_size
-        self.x0        = x0
-        self.y0        = y0
+    def __init__(self, rows, cols, cell_size, x0, y0, passages=None):
+        self.rows     = rows
+        self.cols     = cols
+        self.cell     = cell_size
+        self.x0       = x0
+        self.y0       = y0
+        self.passages = passages if passages is not None else set()
 
-        # Grille de découverte
-        self.decouverte = [[False] * cols for _ in range(rows)]
-
-        # Passages connus entre cellules voisines (même format que `passages` du labyrinthe)
-        # clé canonique : (min((r1,c1),(r2,c2)), max(...))
+        self.decouverte     = [[False] * cols for _ in range(rows)]
         self.passages_connus = set()
-
-        # Oeufs repérés par le LIDAR (référence vers les dicts du main)
-        self.oeufs_detectes = []
+        self.oeufs_detectes  = []
 
     # ── Conversion coordonnées ───────────────────────────────────────────────
 
     def monde_vers_cellule(self, x, y):
-        """Retourne (r, c) de la cellule contenant le point monde (x, y)."""
         c = int((x - self.x0) / self.cell)
         r = self.rows - 1 - int((y - self.y0) / self.cell)
         c = max(0, min(self.cols - 1, c))
@@ -47,17 +34,66 @@ class Cartographie:
         y = self.y0 + (self.rows - 1 - r) * self.cell + self.cell / 2
         return x, y
 
+    # ── Chemin de cellules entre deux points (DDA) ───────────────────────────
+
+    def _cellules_rayon(self, ox, oy, dx, dy, dist):
+        """
+        Retourne la liste ordonnée de cellules (r,c) traversées par le rayon,
+        en avançant pas à pas avec un pas < demi-cellule pour ne jamais sauter
+        une frontière. S'arrête dès qu'un mur est détecté.
+        """
+        pas = self.cell * 0.2          # pas petit : on ne saute jamais une arête
+        n   = int(dist / pas) + 1
+        rc_prev = self.monde_vers_cellule(ox, oy)
+        cellules = [rc_prev]
+
+        for k in range(1, n + 1):
+            t  = min(k * pas, dist)
+            px = ox + dx * t
+            py = oy + dy * t
+            rc_cur = self.monde_vers_cellule(px, py)
+
+            if rc_cur == rc_prev:
+                continue
+
+            # Décomposer le saut en étapes unitaires (évite les diagonales)
+            r0, c0 = rc_prev
+            r1, c1 = rc_cur
+            dr = 0 if r1 == r0 else (1 if r1 > r0 else -1)
+            dc = 0 if c1 == c0 else (1 if c1 > c0 else -1)
+
+            # Parcourir chaque étape unitaire entre rc_prev et rc_cur
+            r_tmp, c_tmp = r0, c0
+            bloque = False
+
+            # Si saut diagonal (dr!=0 et dc!=0), on passe par les deux voisins cardinaux
+            steps = []
+            if dr != 0 and dc != 0:
+                steps = [(r_tmp + dr, c_tmp), (r_tmp + dr, c_tmp + dc)]
+            else:
+                steps = [(r_tmp + dr, c_tmp + dc)]
+
+            for (rn, cn) in steps:
+                cle = (min((r_tmp, c_tmp), (rn, cn)), max((r_tmp, c_tmp), (rn, cn)))
+                if cle not in self.passages:
+                    bloque = True
+                    break
+                cellules.append((rn, cn))
+                r_tmp, c_tmp = rn, cn
+
+            if bloque:
+                return cellules   # on s'arrête, cellule derrière le mur non incluse
+
+            rc_prev = rc_cur
+
+            if t >= dist:
+                break
+
+        return cellules
+
     # ── Mise à jour depuis le LIDAR ──────────────────────────────────────────
 
     def mettre_a_jour(self, robot, lidar, oeufs_env):
-        """
-        Pour chaque rayon LIDAR :
-          1. Marque la cellule du robot comme découverte.
-          2. Parcourt les cellules traversées par le rayon → découvertes.
-          3. À chaque franchissement de frontière entre deux cellules,
-             si le rayon passe sans impact avant → enregistre un passage.
-          4. Si le point d'impact correspond à un œuf → l'ajoute à oeufs_detectes.
-        """
         rc_robot = self.monde_vers_cellule(robot.x, robot.y)
         self._marquer(rc_robot)
 
@@ -65,55 +101,30 @@ class Cartographie:
             dx = math.cos(angle)
             dy = math.sin(angle)
 
+            cellules = self._cellules_rayon(robot.x, robot.y, dx, dy, dist)
+
             rc_prev = rc_robot
-            self._marquer(rc_prev)
-
-            # Pas de marche le long du rayon (doit être < cell/2 pour ne pas sauter de cellule)
-            pas = self.cell * 0.4
-            nb_pas = int(dist / pas) + 1
-
-            for k in range(1, nb_pas + 1):
-                t = min(k * pas, dist)
-                px = robot.x + dx * t
-                py = robot.y + dy * t
-                rc_cur = self.monde_vers_cellule(px, py)
-
-                self._marquer(rc_cur)
-
-                # Franchissement de frontière → possible passage
-                if rc_cur != rc_prev:
-                    self._enregistrer_passage(rc_prev, rc_cur)
-                    rc_prev = rc_cur
-
-                if t >= dist:
-                    break
+            for rc in cellules:
+                self._marquer(rc)
+                cle = (min(rc_prev, rc), max(rc_prev, rc))
+                if abs(rc[0]-rc_prev[0]) + abs(rc[1]-rc_prev[1]) == 1:
+                    self.passages_connus.add(cle)
+                rc_prev = rc
 
             # Détection d'œuf au point d'impact
             for oeuf in oeufs_env:
                 if oeuf.get("collecte"):
                     continue
-                dist_impact = math.hypot(xi - oeuf["x"], yi - oeuf["y"])
-                if dist_impact < oeuf["rayon"] + 0.3:
+                if math.hypot(xi - oeuf["x"], yi - oeuf["y"]) < oeuf["rayon"] + 0.3:
                     if oeuf not in self.oeufs_detectes:
                         self.oeufs_detectes.append(oeuf)
 
-    # ── Helpers internes ─────────────────────────────────────────────────────
+    # ── Helpers ──────────────────────────────────────────────────────────────
 
     def _marquer(self, rc):
         r, c = rc
         if 0 <= r < self.rows and 0 <= c < self.cols:
             self.decouverte[r][c] = True
-
-    def _enregistrer_passage(self, rc1, rc2):
-        """Enregistre un passage entre deux cellules voisines directes."""
-        r1, c1 = rc1
-        r2, c2 = rc2
-        # On n'enregistre que les voisins directs (pas de diagonale)
-        if abs(r1 - r2) + abs(c1 - c2) == 1:
-            cle = (min(rc1, rc2), max(rc1, rc2))
-            self.passages_connus.add(cle)
-
-    # ── Accesseurs ────────────────────────────────────────────────────────────
 
     def est_decouverte(self, r, c):
         return self.decouverte[r][c]
