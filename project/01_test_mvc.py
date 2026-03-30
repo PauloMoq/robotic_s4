@@ -1,5 +1,4 @@
 import warnings
-#ignore les UserWarning provenant de pygame.pkgdata
 warnings.filterwarnings("ignore", category=UserWarning, module="pygame.pkgdata")
 
 from robot.model.RobotMobile import *
@@ -19,13 +18,16 @@ def main():
                             {"x": -4.0, "y": -1.0, "rayon": 1.2},
                             {"x": 0.0, "y": 4.0, "rayon": 0.5}
                         ])
-    robot = RobotMobile(moteur=MoteurDifferentiel())
-    vue = VuePygame()
+    robot      = RobotMobile(moteur=MoteurDifferentiel())
+    vue        = VuePygame()
     controleur = ControleurPygame(robot)
 
-    clock = pygame.time.Clock()
-
+    clock   = pygame.time.Clock()
+    timer   = 0.0
     running = True
+
+    pygame.display.set_caption("01_test_mvc.py")
+
     print("Simulation lancée.")
     print("- Quitter : Croix rouge, touche ECHAP ou Ctrl+C (dans la fenêtre)")
 
@@ -43,7 +45,17 @@ def main():
                         print("Ctrl+C détecté dans la fenêtre.")
                         running = False
 
-            dt = clock.tick(60) / 1000.0
+                    if event.key == pygame.K_TAB:
+                        if hasattr(robot.moteur, 'vx'):
+                            robot.moteur = MoteurDifferentiel()
+                            print("Moteur → Différentiel")
+                        else:
+                            robot.moteur = MoteurOmnidirectionnel()
+                            print("Moteur → Omnidirectionnel")
+
+            dt     = clock.tick(60) / 1000.0
+            timer += dt
+
             commande = controleur.lire_commande()
             robot.commander(**commande)
             robot.mettre_a_jour(dt, env)
@@ -52,6 +64,10 @@ def main():
             vue.dessiner_grille()
             vue.dessiner_environnement(env)
             vue.dessiner_robot(robot)
+            vue.dessiner_timer(timer)
+            vue.dessiner_type_moteur(robot)
+            vue.dessiner_controles(robot)
+
             pygame.display.flip()
 
     except KeyboardInterrupt:
