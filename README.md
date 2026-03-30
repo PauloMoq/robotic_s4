@@ -1,7 +1,7 @@
 # PROJET : SIMULATION ROBOT MOBILE (MVC)
 
 ## AUTEUR
-Paul HURDEBOURCQ (PauloMoq)
+PauloMoq
 
 ## FORMATION
 Master 2 Data&IA (Alternance)
