@@ -177,9 +177,23 @@ class VuePygame:
         surf = font.render(f"Moteur : {label}", True, couleur)
         self.screen.blit(surf, (self.largeur - surf.get_width() - 20, 50))
 
-    def dessiner_controles(self, robot, avec_regenerer=False):
+    def dessiner_mode_auto(self, mode_auto: bool):
+        """Affiche le mode de conduite (AUTONOME / MANUEL) sous le chrono."""
+        label   = "AUTONOME" if mode_auto else "MANUEL"
+        couleur = (80, 200, 120) if mode_auto else (255, 180, 60)
+        font = pygame.font.SysFont("monospace", 20, bold=True)
+        surf = font.render(f"Mode : {label}", True, couleur)
+        self.screen.blit(surf, (self.largeur - surf.get_width() - 20, 50))
+
+    def dessiner_controles(self, robot, avec_regenerer=False, avec_mode_auto=False):
         """Panneau des touches en bas à droite, adapté au type de moteur."""
-        if robot.moteur is not None and hasattr(robot.moteur, 'vx'):
+        if avec_mode_auto:
+            lignes = [
+                ("↑ ↓ ← →", "Translater (manuel)"),
+                ("Q / D", "Rotation (manuel)"),
+                ("TAB", "Auto / Manuel"),
+            ]
+        elif robot.moteur is not None and hasattr(robot.moteur, 'vx'):
             lignes = [
                 ("↑ ↓ ← →", "Translater"),
                 ("Q / D", "Rotation"),
