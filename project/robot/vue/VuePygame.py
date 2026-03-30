@@ -177,22 +177,24 @@ class VuePygame:
         surf = font.render(f"Moteur : {label}", True, couleur)
         self.screen.blit(surf, (self.largeur - surf.get_width() - 20, 50))
 
-    def dessiner_controles(self, robot):
+    def dessiner_controles(self, robot, avec_regenerer=False):
         """Panneau des touches en bas à droite, adapté au type de moteur."""
         if robot.moteur is not None and hasattr(robot.moteur, 'vx'):
             lignes = [
                 ("↑ ↓ ← →", "Translater"),
                 ("Q / D", "Rotation"),
                 ("TAB", "Moteur Differentiel"),
-                ("ECHAP", "Quitter"),
             ]
         else:
             lignes = [
                 ("↑ / ↓", "Avancer / Reculer"),
                 ("← / →", "Tourner"),
                 ("TAB", "Moteur Omnidirectionnel"),
-                ("ECHAP", "Quitter"),
             ]
+
+        if avec_regenerer:
+            lignes.append(("R", "Regenerer"))
+        lignes.append(("ECHAP", "Quitter"))
 
         font_titre = pygame.font.SysFont("monospace", 18, bold=True)
         font_ligne = pygame.font.SysFont("monospace", 17)
