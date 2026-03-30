@@ -9,6 +9,23 @@ Master 2 Data&IA (Alternance)
 ## ANNEE
 2024-2026
 
+# TO-DO
+## QOL :
+- Clean up affichage (print sur la fenêtre moches + jeu fini)
+- Opti dessin des oeufs
+- Son de collecte
+- Skin de robots
+
+## TECH : 
+- Ajouter une sortie au labyrinthe 
+- Robot doit trouver la sortie après la collecte des 3 oeufs
+- 2 Robots avec déplacements différents (2eme Robot en A* ?)
+
+## RENDU :
+- Diapo
+- Clean code
+- Clean README
+
 ---
 
 ## INSTALLATION ET LANCEMENT
