@@ -1,30 +1,6 @@
 import random
 
-# ---------------------------------------------------------------------------
-# Labyrinthe — Recursive Backtracker (DFS)
-#
-# Fournit la génération procédurale du labyrinthe et les utilitaires
-# de conversion entre coordonnées cellule et coordonnées monde.
-#
-# Usage :
-#   laby = Labyrinthe(cols, rows, cell_size=2.0, epaisseur_mur=0.06)
-#   laby.generer(seed=42)
-#   murs    = laby.construire_murs()
-#   x, y    = laby.centre_cellule_monde(r, c)
-#   r, c    = laby.monde_vers_cellule(x, y)
-# ---------------------------------------------------------------------------
-
-
 class Labyrinthe:
-    """
-    Génère un labyrinthe parfait par Recursive Backtracker (DFS itératif).
-
-    Attributs publics après appel à generer() :
-        passages : set de paires canoniques ((r1,c1),(r2,c2)) représentant
-                   les murs abattus (cellules voisines sans mur entre elles).
-        x0, y0   : coin bas-gauche du labyrinthe en coordonnées monde.
-    """
-
     def __init__(self, cols: int, rows: int,
                  cell_size: float = 2.0,
                  epaisseur_mur: float = 0.06):
@@ -33,19 +9,12 @@ class Labyrinthe:
         self.cell = cell_size
         self.e    = epaisseur_mur
 
-        # Coin bas-gauche centré sur l'origine
         self.x0 = -cols * cell_size / 2
         self.y0 = -rows * cell_size / 2
 
         self.passages: set = set()
 
-    # ── Génération DFS ───────────────────────────────────────────────────────
-
     def generer(self, seed=None) -> set:
-        """
-        Lance le Recursive Backtracker et remplit self.passages.
-        Retourne également passages pour usage immédiat.
-        """
         if seed is not None:
             random.seed(seed)
 
@@ -77,41 +46,43 @@ class Labyrinthe:
         self.passages = passages
         return passages
 
-    # ── Conversion coordonnées ───────────────────────────────────────────────
-
     def cellule_vers_monde(self, r: int, c: int) -> tuple:
-        """Retourne le coin bas-gauche de la cellule (r, c) en coordonnées monde."""
         x = self.x0 + c * self.cell
         y = self.y0 + (self.rows - 1 - r) * self.cell
         return x, y
 
     def centre_cellule_monde(self, r: int, c: int) -> tuple:
-        """Retourne le centre de la cellule (r, c) en coordonnées monde."""
         x, y = self.cellule_vers_monde(r, c)
         return x + self.cell / 2, y + self.cell / 2
 
     def monde_vers_cellule(self, x: float, y: float) -> tuple:
-        """Convertit des coordonnées monde en cellule (r, c), clampée à la grille."""
         c = round((x - self.x0 - self.cell / 2) / self.cell)
         r = self.rows - 1 - round((y - self.y0 - self.cell / 2) / self.cell)
         return max(0, min(self.rows - 1, r)), max(0, min(self.cols - 1, c))
 
     def cellule_aleatoire(self, exclure=None) -> tuple:
-        """Retourne une cellule (r, c) aléatoire, différente de `exclure` si fourni."""
         while True:
             r = random.randint(0, self.rows - 1)
             c = random.randint(0, self.cols - 1)
             if exclure is None or (r, c) != exclure:
                 return r, c
 
-    # ── Construction des murs ────────────────────────────────────────────────
+    def placer_oeufs(self, nb: int, rayon: float = 0.18,
+                     cellule_exclue=None) -> list:
+        import random
+        cellules: set = set()
+        while len(cellules) < nb:
+            r = random.randint(0, self.rows - 1)
+            c = random.randint(0, self.cols - 1)
+            if cellule_exclue is None or (r, c) != cellule_exclue:
+                cellules.add((r, c))
+        oeufs = []
+        for r, c in cellules:
+            x, y = self.centre_cellule_monde(r, c)
+            oeufs.append({"x": x, "y": y, "rayon": rayon, "collecte": False})
+        return oeufs
 
     def construire_murs(self) -> list:
-        """
-        Convertit la grille et self.passages en liste de murs {x, y, w, h}
-        compatibles avec Environnement.
-        Inclut les bordures extérieures et les murs intérieurs non abattus.
-        """
         murs = []
 
         def mh(x, y, w):
@@ -125,13 +96,11 @@ class Labyrinthe:
         larg = self.cols * self.cell
         haut = self.rows * self.cell
 
-        # Bordures extérieures
         mh(self.x0, self.y0,        larg)
         mh(self.x0, self.y0 + haut, larg)
         mv(self.x0,        self.y0, haut)
         mv(self.x0 + larg, self.y0, haut)
 
-        # Murs intérieurs
         for r in range(self.rows):
             for c in range(self.cols):
                 cx, cy = self.cellule_vers_monde(r, c)
