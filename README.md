@@ -20,6 +20,7 @@ Master 2 Data&IA (Alternance)
 - Ajouter une sortie au labyrinthe 
 - Robot doit trouver la sortie après la collecte des 3 oeufs
 - 2 Robots avec déplacements différents (2eme Robot en A* ?)
+- Moteur Différentiel à ajouter dans la carto autonome
 
 ## RENDU :
 - Diapo
