@@ -11,7 +11,6 @@ class VuePygame:
         pygame.display.set_caption("Simulation Robot Mobile")
         self.clock = pygame.time.Clock()
 
-        # Couleurs
         self.COLOR_BG       = (30, 33, 36)
         self.COLOR_GRID     = (50, 55, 60)
         self.COLOR_ROBOT    = (0, 150, 255)
@@ -51,8 +50,6 @@ class VuePygame:
             pygame.draw.circle(self.screen, (255, 255, 255), (px, py), r_px, 1)
 
     def dessiner_murs(self, env):
-        """Dessine les murs. Pour les murs très fins (<4px) on force 2px min
-        afin qu ils restent visibles, coins arrondis uniquement si assez epais."""
         for mur in env.murs:
             px, py = self.convertir_coordonnees(mur["x"], mur["y"] + mur["h"])
             pw = max(2, int(mur["w"] * self.scale))
@@ -64,7 +61,6 @@ class VuePygame:
                 pygame.draw.rect(self.screen, self.COLOR_MUR_BORD, rect, 1, border_radius=rayon_coin)
 
     def dessiner_arrivee(self, env):
-        """Dessine le point d'arrivée avec un effet de halo animé."""
         if env.arrivee is None:
             return
         px, py = self.convertir_coordonnees(env.arrivee["x"], env.arrivee["y"])
@@ -82,7 +78,6 @@ class VuePygame:
         self.screen.blit(texte, texte.get_rect(center=(px, py)))
 
     def afficher_victoire(self):
-        """Affiche un message de victoire centré à l'écran."""
         overlay = pygame.Surface((self.largeur, self.hauteur), pygame.SRCALPHA)
         overlay.fill((0, 0, 0, 150))
         self.screen.blit(overlay, (0, 0))
@@ -97,7 +92,6 @@ class VuePygame:
         self.screen.blit(texte2, texte2.get_rect(center=(self.largeur // 2, self.hauteur // 2 + 40)))
 
     def dessiner_chemin(self, controleur_auto):
-        """Dessine le chemin BFS restant sous forme de ligne pointillée verte."""
         points = controleur_auto.chemin_restant
         if len(points) < 2:
             return
@@ -108,11 +102,6 @@ class VuePygame:
             pygame.draw.circle(self.screen, (50, 200, 80), (px, py), 3)
 
     def dessiner_lidar(self, robot, lidar):
-        """
-        Dessine les rayons lidar depuis le robot jusqu au point d impact.
-          - Rayon : ligne jaune semi-transparente
-          - Impact : petit cercle rouge au point de contact
-        """
         if not lidar.mesures:
             return
 
@@ -130,10 +119,7 @@ class VuePygame:
     def tick(self, fps=60):
         self.clock.tick(fps)
 
-    # ── Dessin des œufs ──────────────────────────────────────────────────────
-
     def dessiner_oeufs(self, oeufs, rayon_oeuf=0.18):
-        """Dessine les œufs restants sous forme d'ellipse jaune/blanche."""
         for oeuf in oeufs:
             if oeuf["collecte"]:
                 continue
@@ -145,14 +131,12 @@ class VuePygame:
             pygame.draw.ellipse(self.screen, (255, 255, 255), rect, 2)
 
     def dessiner_compteur_oeufs(self, oeufs, nb_total):
-        """Affiche le compteur d'œufs restants en haut à gauche."""
         restants = sum(1 for o in oeufs if not o["collecte"])
         font = pygame.font.SysFont("monospace", 26, bold=True)
         texte = font.render(f"Oeufs restants : {restants} / {nb_total}", True, (255, 230, 60))
         self.screen.blit(texte, (20, 16))
 
     def dessiner_timer(self, timer):
-        """Affiche le timer en haut à droite."""
         minutes  = int(timer) // 60
         secondes = int(timer) % 60
         centimes = int((timer % 1) * 100)
@@ -162,7 +146,6 @@ class VuePygame:
         self.screen.blit(surf, (self.largeur - surf.get_width() - 20, 16))
 
     def dessiner_type_moteur(self, robot):
-        """Affiche le type de moteur juste sous le chrono (haut à droite)."""
         if robot.moteur is None:
             label   = "Aucun moteur"
             couleur = (160, 160, 160)
@@ -178,7 +161,6 @@ class VuePygame:
         self.screen.blit(surf, (self.largeur - surf.get_width() - 20, 50))
 
     def dessiner_mode_auto(self, mode_auto: bool):
-        """Affiche le mode de conduite (AUTONOME / MANUEL) sous le chrono."""
         label   = "AUTONOME" if mode_auto else "MANUEL"
         couleur = (80, 200, 120) if mode_auto else (255, 180, 60)
         font = pygame.font.SysFont("monospace", 20, bold=True)
@@ -186,7 +168,6 @@ class VuePygame:
         self.screen.blit(surf, (self.largeur - surf.get_width() - 20, 50))
 
     def dessiner_controles(self, robot, avec_regenerer=False, avec_mode_auto=False):
-        """Panneau des touches en bas à droite, adapté au type de moteur."""
         if avec_mode_auto:
             lignes = [
                 ("↑ ↓ ← →", "Translater (manuel)"),
@@ -238,7 +219,6 @@ class VuePygame:
             y += LIGNE_H
 
     def afficher_victoire_oeufs(self, timer=None):
-        """Overlay de victoire pour la chasse aux œufs."""
         overlay = pygame.Surface((self.largeur, self.hauteur), pygame.SRCALPHA)
         overlay.fill((0, 0, 0, 160))
         self.screen.blit(overlay, (0, 0))
@@ -258,8 +238,6 @@ class VuePygame:
 
         t3 = font_small.render("Appuyez sur ECHAP pour quitter", True, (160, 160, 160))
         self.screen.blit(t3, (self.largeur // 2 - t3.get_width() // 2, self.hauteur // 2 + 60))
-
-    # ── Carte d'occupation ───────────────────────────────────────────────────
 
     def dessiner_carte(self, carte):
         from robot.model.CarteOccupation import INCONNUE, MUR
@@ -287,7 +265,6 @@ class VuePygame:
         self.screen.blit(surf, (0, 0))
 
     def dessiner_etat_exploration(self, controleur):
-        """Affiche l'état du contrôleur (EXPLORATION / COLLECTE) en bas à gauche."""
         font = pygame.font.SysFont("monospace", 20, bold=True)
         etat = controleur.etat.upper()
         couleur = (80, 200, 120) if etat == "EXPLORATION" else (255, 200, 50)
@@ -295,11 +272,6 @@ class VuePygame:
         self.screen.blit(surf, (20, self.hauteur - 36))
 
     def dessiner_cartographie(self, carto):
-        """
-        Rendu fog-of-war propre :
-          - Cellule non découverte  → carré noir plein
-          - Cellule découverte      → fond gris foncé + murs sur les arêtes sans passage
-        """
         taille_px = int(carto.cell * self.scale) + 1
         ep_mur    = max(5, int(self.scale * 0.18))
         COLOR_FOG   = (0, 0, 0)
@@ -338,7 +310,6 @@ class VuePygame:
                     pygame.draw.rect(self.screen, COLOR_MUR_B, mr, 1)
 
     def dessiner_oeufs_detectes(self, carto, rayon_oeuf=0.18):
-        """Affiche uniquement les œufs que le LIDAR a déjà détectés."""
         for oeuf in carto.oeufs_detectes:
             if oeuf.get("collecte"):
                 continue

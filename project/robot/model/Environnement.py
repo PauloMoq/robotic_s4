@@ -1,11 +1,6 @@
 import math
 
 class Environnement:
-    """
-    obstacles   : objets circulaires avec collision physique ET LIDAR (murs ronds)
-    collectables: objets circulaires détectables par le LIDAR mais sans collision physique (œufs)
-    murs        : segments rectangulaires avec collision physique ET LIDAR
-    """
     def __init__(self, largeur=16.0, hauteur=12.0,
                  obstacles=None, murs=None, collectables=None, arrivee=None):
         self.largeur      = largeur
@@ -16,11 +11,9 @@ class Environnement:
         self.arrivee      = arrivee
 
     def est_en_collision(self, x, y, rayon_robot):
-        # Obstacles circulaires physiques
         for obs in self.obstacles:
             if math.hypot(x - obs["x"], y - obs["y"]) < obs["rayon"] + rayon_robot:
                 return True
-        # Murs rectangulaires
         for mur in self.murs:
             mx, my = mur["x"], mur["y"]
             cx = max(mx, min(x, mx + mur["w"]))
@@ -28,7 +21,6 @@ class Environnement:
             if math.hypot(x - cx, y - cy) < rayon_robot:
                 return True
         return False
-        # Les collectables ne génèrent PAS de collision physique
 
     def est_a_l_arrivee(self, x, y):
         if self.arrivee is None:
