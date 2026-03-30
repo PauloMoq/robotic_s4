@@ -60,7 +60,8 @@ def main():
     victoire  = False
     running   = True
 
-    pygame.display.set_caption("03 — Labyrinthe + LIDAR + Autonome")
+    pygame.display.set_caption("03_test_lidar.py")
+
     print("=== Labyrinthe + LIDAR + Pilote Autonome ===")
     print(f"Grille {COLS}×{ROWS}, cellules {CELL} unités")
     print(f"Départ  : cellule ({r_dep},{c_dep})")

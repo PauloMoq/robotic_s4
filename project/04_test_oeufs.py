@@ -71,7 +71,8 @@ def main():
     relancer  = False
     timer     = 0.0
 
-    pygame.display.set_caption("04 — Chasse aux Œufs — Robot LIDAR")
+    pygame.display.set_caption("04_test_oeufs.py")
+
     print("=== Chasse aux Œufs — Robot LIDAR ===")
     print(f"Grille {COLS}×{ROWS}, {NB_OEUFS} œufs cachés")
     print(f"Départ robot : cellule ({r_dep},{c_dep})")
