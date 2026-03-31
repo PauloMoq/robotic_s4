@@ -6,32 +6,8 @@ ETAT_COLLECTE    = "collecte"
 
 
 class ControleurExploration:
-    """
-    Contrôleur autonome pour la cartographie progressive avec collecte prioritaire.
-
-    Logique stable :
-      - On fixe une cible (cellule inconnue la plus proche OU œuf détecté).
-      - On calcule le BFS UNE seule fois vers cette cible.
-      - On suit le chemin jusqu'au bout sans recalculer.
-      - Seulement à l'arrivée (ou si un œuf est détecté), on choisit une nouvelle cible.
-
-    Machine à états :
-      EXPLORATION — va vers la cellule inconnue la plus proche
-      COLLECTE    — va vers un œuf détecté (priorité)
-    """
-
     def __init__(self, robot, lidar, carto, passages_reels, laby,
                  rc_depart, v_max=2.0, omega_max=3.0):
-        """
-        robot          : RobotMobile
-        lidar          : Lidar
-        carto          : Cartographie
-        passages_reels : set de passages réels du labyrinthe (depuis Labyrinthe.passages)
-        laby           : instance de Labyrinthe (pour conversions coords)
-        rc_depart      : (row, col) de départ du robot
-        v_max          : vitesse max (unités/s)
-        omega_max      : vitesse angulaire max (rad/s)
-        """
         self.robot          = robot
         self.lidar          = lidar
         self.carto          = carto
@@ -51,10 +27,7 @@ class ControleurExploration:
 
         self._fixer_prochaine_cible(rc_depart)
 
-    # ── BFS utilitaires (privés) ─────────────────────────────────────────────
-
     def _bfs_vers(self, depart, arrivee, passages_graph) -> list:
-        """BFS départ→arrivée sur passages_graph. Retourne la liste de cellules ou []."""
         queue = deque([depart])
         pred  = {depart: None}
         while queue:
@@ -81,11 +54,6 @@ class ControleurExploration:
         return chemin
 
     def _bfs_cellule_inconnue_proche(self, depart) -> tuple:
-        """
-        BFS depuis depart sur passages_reels.
-        Retourne la cellule accessible la plus proche non encore découverte,
-        ou None si tout est exploré.
-        """
         queue   = deque([depart])
         visited = {depart}
         while queue:
@@ -105,22 +73,13 @@ class ControleurExploration:
                 queue.append(v)
         return None
 
-    # ── Helpers ──────────────────────────────────────────────────────────────
-
     @staticmethod
     def _norm_angle(a):
         while a >  math.pi: a -= 2 * math.pi
         while a < -math.pi: a += 2 * math.pi
         return a
 
-    # ── Fixation de la cible ─────────────────────────────────────────────────
-
     def _fixer_prochaine_cible(self, rc_robot=None):
-        """
-        Choisit la prochaine cible et calcule le chemin BFS.
-        N'est appelé QUE quand la destination précédente est atteinte
-        ou lors d'une interruption pour collecte d'œuf.
-        """
         if rc_robot is None:
             rc_robot = self.laby.monde_vers_cellule(self.robot.x, self.robot.y)
 
@@ -138,7 +97,6 @@ class ControleurExploration:
 
         self.rc_cible = rc_cible
 
-        # BFS sur passages connus, fallback passages réels
         chemin = self._bfs_vers(rc_robot, rc_cible, self.carto.passages_connus)
         if not chemin:
             chemin = self._bfs_vers(rc_robot, rc_cible, self.passages_reels)
@@ -146,14 +104,7 @@ class ControleurExploration:
         self.chemin_monde = [self.laby.centre_cellule_monde(r, c) for r, c in chemin]
         self.idx_waypoint = 0
 
-    # ── Mise à jour de l'état ─────────────────────────────────────────────────
-
     def mettre_a_jour_etat(self, oeufs):
-        """
-        Appelé chaque frame. Gère deux cas :
-          1. Œuf collecté → retour en EXPLORATION
-          2. Nouvel œuf détecté → interruption et switch en COLLECTE
-        """
         if self._etat == ETAT_COLLECTE:
             if self.cible_oeuf is None or self.cible_oeuf["collecte"]:
                 print("[État] → EXPLORATION")
@@ -175,13 +126,12 @@ class ControleurExploration:
                     rc_robot = self.laby.monde_vers_cellule(self.robot.x, self.robot.y)
                     self._fixer_prochaine_cible(rc_robot)
 
-    # ── Commande principale ───────────────────────────────────────────────────
-
     def calculer_commande(self) -> dict:
-        """Retourne {"vx", "vy", "omega"} pour MoteurOmnidirectionnel."""
+        est_omni = hasattr(self.robot.moteur, 'vx')
+
         if not self.chemin_monde:
             self._fixer_prochaine_cible()
-            return {"vx": 0.0, "vy": 0.0, "omega": 0.0}
+            return {"vx": 0.0, "vy": 0.0, "omega": 0.0} if est_omni else {"v": 0.0, "omega": 0.0}
 
         while self.idx_waypoint < len(self.chemin_monde) - 1:
             wx, wy = self.chemin_monde[self.idx_waypoint]
@@ -197,27 +147,32 @@ class ControleurExploration:
 
         if self.idx_waypoint == len(self.chemin_monde) - 1 and dist_wp < self.cell * 0.3:
             self._fixer_prochaine_cible()
-            return {"vx": 0.0, "vy": 0.0, "omega": 0.0}
+            return {"vx": 0.0, "vy": 0.0, "omega": 0.0} if est_omni else {"v": 0.0, "omega": 0.0}
 
         if dist_wp < 1e-6:
-            return {"vx": 0.0, "vy": 0.0, "omega": 0.0}
-
-        nx = dx / dist_wp
-        ny = dy / dist_wp
-
-        theta    = self.robot.orientation
-        vx_robot =  nx * math.cos(theta) + ny * math.sin(theta)
-        vy_robot = -nx * math.sin(theta) + ny * math.cos(theta)
+            return {"vx": 0.0, "vy": 0.0, "omega": 0.0} if est_omni else {"v": 0.0, "omega": 0.0}
 
         angle_cible = math.atan2(dy, dx)
+        theta       = self.robot.orientation
         delta       = self._norm_angle(angle_cible - theta)
         omega       = max(-self.omega_max, min(self.omega_max, 2.0 * delta))
 
-        return {
-            "vx":    self.v_max * vx_robot,
-            "vy":    self.v_max * vy_robot,
-            "omega": omega,
-        }
+        if est_omni:
+            nx = dx / dist_wp
+            ny = dy / dist_wp
+            vx_robot =  nx * math.cos(theta) + ny * math.sin(theta)
+            vy_robot = -nx * math.sin(theta) + ny * math.cos(theta)
+            return {
+                "vx":    self.v_max * vx_robot,
+                "vy":    self.v_max * vy_robot,
+                "omega": omega,
+            }
+        else:
+            facteur_v = max(0.0, 1.0 - abs(delta) / (math.pi / 2))
+            return {
+                "v":     self.v_max * facteur_v,
+                "omega": omega,
+            }
 
     @property
     def chemin_restant(self):
