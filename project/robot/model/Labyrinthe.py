@@ -1,5 +1,6 @@
 import random
 
+
 class Labyrinthe:
     def __init__(self, cols: int, rows: int,
                  cell_size: float = 2.0,
@@ -13,6 +14,7 @@ class Labyrinthe:
         self.y0 = -rows * cell_size / 2
 
         self.passages: set = set()
+        self.sortie: dict  = {}
 
     def generer(self, seed=None) -> set:
         if seed is not None:
@@ -44,7 +46,41 @@ class Labyrinthe:
                 stack.pop()
 
         self.passages = passages
+        self._generer_sortie(rc_exclue=(r0, c0))
         return passages
+
+    def _generer_sortie(self, rc_exclue=None):
+        candidats = []
+        for c in range(self.cols):
+            candidats.append((0,             c, "haut"))
+            candidats.append((self.rows - 1, c, "bas"))
+        for r in range(self.rows):
+            candidats.append((r, 0,             "gauche"))
+            candidats.append((r, self.cols - 1, "droite"))
+
+        if rc_exclue is not None:
+            candidats = [(r, c, cote) for r, c, cote in candidats
+                         if (r, c) != rc_exclue]
+
+        r, c, cote = random.choice(candidats)
+        cx, cy = self.centre_cellule_monde(r, c)
+
+        if cote == "haut":
+            sx, sy = cx, cy + self.cell / 2
+        elif cote == "bas":
+            sx, sy = cx, cy - self.cell / 2
+        elif cote == "gauche":
+            sx, sy = cx - self.cell / 2, cy
+        else:
+            sx, sy = cx + self.cell / 2, cy
+
+        self.sortie = {
+            "x":     sx,
+            "y":     sy,
+            "rayon": self.cell * 0.4,
+            "rc":    (r, c),
+            "cote":  cote,
+        }
 
     def cellule_vers_monde(self, r: int, c: int) -> tuple:
         x = self.x0 + c * self.cell
@@ -69,13 +105,16 @@ class Labyrinthe:
 
     def placer_oeufs(self, nb: int, rayon: float = 0.18,
                      cellule_exclue=None) -> list:
-        import random
+        rc_sortie = self.sortie.get("rc")
         cellules: set = set()
         while len(cellules) < nb:
             r = random.randint(0, self.rows - 1)
             c = random.randint(0, self.cols - 1)
-            if cellule_exclue is None or (r, c) != cellule_exclue:
-                cellules.add((r, c))
+            if cellule_exclue is not None and (r, c) == cellule_exclue:
+                continue
+            if rc_sortie is not None and (r, c) == rc_sortie:
+                continue
+            cellules.add((r, c))
         oeufs = []
         for r, c in cellules:
             x, y = self.centre_cellule_monde(r, c)
@@ -93,13 +132,34 @@ class Labyrinthe:
             if h > self.e:
                 murs.append({"x": x, "y": y, "w": self.e, "h": h})
 
-        larg = self.cols * self.cell
-        haut = self.rows * self.cell
+        larg       = self.cols * self.cell
+        haut       = self.rows * self.cell
+        scote      = self.sortie["cote"]
+        cx_s, cy_s = self.cellule_vers_monde(self.sortie["rc"][0], self.sortie["rc"][1])
 
-        mh(self.x0, self.y0,        larg)
-        mh(self.x0, self.y0 + haut, larg)
-        mv(self.x0,        self.y0, haut)
-        mv(self.x0 + larg, self.y0, haut)
+        if scote == "bas":
+            mh(self.x0,          self.y0, cx_s - self.x0)
+            mh(cx_s + self.cell, self.y0, self.x0 + larg - (cx_s + self.cell))
+        else:
+            mh(self.x0, self.y0, larg)
+
+        if scote == "haut":
+            mh(self.x0,          self.y0 + haut, cx_s - self.x0)
+            mh(cx_s + self.cell, self.y0 + haut, self.x0 + larg - (cx_s + self.cell))
+        else:
+            mh(self.x0, self.y0 + haut, larg)
+
+        if scote == "gauche":
+            mv(self.x0, self.y0,          cy_s - self.y0)
+            mv(self.x0, cy_s + self.cell, self.y0 + haut - (cy_s + self.cell))
+        else:
+            mv(self.x0, self.y0, haut)
+
+        if scote == "droite":
+            mv(self.x0 + larg, self.y0,          cy_s - self.y0)
+            mv(self.x0 + larg, cy_s + self.cell, self.y0 + haut - (cy_s + self.cell))
+        else:
+            mv(self.x0 + larg, self.y0, haut)
 
         for r in range(self.rows):
             for c in range(self.cols):
