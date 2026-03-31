@@ -10,6 +10,7 @@ class VuePygame:
         self.screen = pygame.display.set_mode((largeur, hauteur))
         pygame.display.set_caption("Simulation Robot Mobile")
         self.clock = pygame.time.Clock()
+
         self.COLOR_BG       = (30, 33, 36)
         self.COLOR_GRID     = (50, 55, 60)
         self.COLOR_ROBOT    = (0, 150, 255)
@@ -84,7 +85,7 @@ class VuePygame:
         font_grande = pygame.font.SysFont("monospace", 64, bold=True)
         font_petite = pygame.font.SysFont("monospace", 28)
 
-        texte1 = font_grande.render("ARRIVÉE !", True, (50, 220, 100))
+        texte1 = font_grande.render("ARRIVEE !", True, (50, 220, 100))
         texte2 = font_petite.render("Appuie sur ECHAP pour quitter", True, (200, 200, 200))
 
         self.screen.blit(texte1, texte1.get_rect(center=(self.largeur // 2, self.hauteur // 2 - 40)))
@@ -172,22 +173,22 @@ class VuePygame:
         if avec_mode_auto:
             lignes = [
                 ("↑ ↓ ← →", "Translater (manuel)"),
-                ("Q / D",   "Rotation (manuel)"),
-                ("TAB",     "Auto / Manuel"),
+                ("Q / D", "Rotation (manuel)"),
+                ("TAB", "Auto / Manuel"),
             ]
             if avec_switch_moteur:
                 lignes.append(("M", "Switch moteur"))
         elif robot.moteur is not None and hasattr(robot.moteur, 'vx'):
             lignes = [
                 ("↑ ↓ ← →", "Translater"),
-                ("Q / D",   "Rotation"),
-                ("TAB",     "Moteur Differentiel"),
+                ("Q / D", "Rotation"),
+                ("TAB", "Moteur Differentiel"),
             ]
         else:
             lignes = [
-                ("↑ / ↓",  "Avancer / Reculer"),
-                ("← / →",  "Tourner"),
-                ("TAB",    "Moteur Omnidirectionnel"),
+                ("↑ / ↓", "Avancer / Reculer"),
+                ("← / →", "Tourner"),
+                ("TAB", "Moteur Omnidirectionnel"),
             ]
 
         if avec_pause:
@@ -198,7 +199,7 @@ class VuePygame:
 
         font_titre = pygame.font.SysFont("monospace", 18, bold=True)
         font_ligne = pygame.font.SysFont("monospace", 17)
-        PAD     = 12
+        PAD = 12
         LIGNE_H = 22
         LARGEUR = 280
 
@@ -223,17 +224,146 @@ class VuePygame:
             self.screen.blit(s_action, (x0 + PAD + 100, y))
             y += LIGNE_H
 
+    def dessiner_controles(self, robot, avec_regenerer=False,
+                           avec_mode_auto=False, avec_pause=False,
+                           avec_switch_moteur=False):
+        est_omni = robot.moteur is not None and hasattr(robot.moteur, 'vx')
+
+        if est_omni:
+            lignes_mouvement = [
+                ("↑ ↓ ← →", "Translater (manuel)" if avec_mode_auto else "Translater"),
+                ("Q / D", "Rotation (manuel)" if avec_mode_auto else "Rotation"),
+            ]
+        else:
+            lignes_mouvement = [
+                ("↑ / ↓", "Avancer / Reculer"),
+                ("← / →", "Tourner"),
+            ]
+
+        lignes = lignes_mouvement[:]
+
+        if avec_mode_auto:
+            lignes.append(("TAB", "Auto / Manuel"))
+            if avec_switch_moteur:
+                label_switch = "-> Differentiel" if est_omni else "-> Omnidirectionnel"
+                lignes.append(("M", label_switch))
+        else:
+            label_tab = "-> Differentiel" if est_omni else "-> Omnidirectionnel"
+            lignes.append(("TAB", label_tab))
+
+        if avec_pause:
+            lignes.append(("ESPACE", "Pause / Reprendre"))
+        if avec_regenerer:
+            lignes.append(("R", "Regenerer"))
+        lignes.append(("H", "Masquer les controles"))
+        lignes.append(("ECHAP", "Quitter"))
+
+        font_titre = pygame.font.SysFont("monospace", 18, bold=True)
+        font_ligne = pygame.font.SysFont("monospace", 17)
+        PAD = 12
+        LIGNE_H = 22
+        LARGEUR = 280
+
+        hauteur_bloc = PAD * 2 + font_titre.get_height() + 6 + len(lignes) * LIGNE_H
+        x0 = self.largeur - LARGEUR - 16
+        y0 = self.hauteur - hauteur_bloc - 16
+
+        fond = pygame.Surface((LARGEUR, hauteur_bloc), pygame.SRCALPHA)
+        fond.fill((0, 0, 0, 140))
+        self.screen.blit(fond, (x0, y0))
+        pygame.draw.rect(self.screen, (80, 80, 100),
+                         pygame.Rect(x0, y0, LARGEUR, hauteur_bloc), 1)
+
+        titre = font_titre.render("CONTROLES", True, (200, 200, 220))
+        self.screen.blit(titre, (x0 + PAD, y0 + PAD))
+        y = y0 + PAD + titre.get_height() + 6
+
+        for touche, action in lignes:
+            s_touche = font_ligne.render(touche, True, (255, 220, 80))
+            s_action = font_ligne.render(action, True, (180, 180, 180))
+            self.screen.blit(s_touche, (x0 + PAD, y))
+            self.screen.blit(s_action, (x0 + PAD + 110, y))
+            y += LIGNE_H
+
+    def dessiner_aide_controles(self):
+        font = pygame.font.SysFont("monospace", 17)
+        surf = font.render("H  afficher les controles", True, (100, 100, 120))
+        x0 = self.largeur - surf.get_width() - 16
+        y0 = self.hauteur - surf.get_height() - 16
+        self.screen.blit(surf, (x0, y0))
+
+    def afficher_victoire_finale(self, timer=None):
+        overlay = pygame.Surface((self.largeur, self.hauteur), pygame.SRCALPHA)
+        overlay.fill((0, 0, 0, 175))
+        self.screen.blit(overlay, (0, 0))
+
+        font_titre = pygame.font.SysFont("monospace", 62, bold=True)
+        font_sub   = pygame.font.SysFont("monospace", 30, bold=True)
+        font_small = pygame.font.SysFont("monospace", 22)
+
+        cy = self.hauteur // 2
+
+        t_titre = font_titre.render("LABYRINTHE TERMINE !", True, (80, 230, 130))
+        self.screen.blit(t_titre, t_titre.get_rect(center=(self.largeur // 2, cy - 90)))
+
+        pygame.draw.line(self.screen, (80, 130, 100),
+                         (self.largeur // 2 - 220, cy - 50),
+                         (self.largeur // 2 + 220, cy - 50), 1)
+
+        t_oeufs = font_sub.render("3 / 3  oeufs collectes", True, (255, 220, 60))
+        self.screen.blit(t_oeufs, t_oeufs.get_rect(center=(self.largeur // 2, cy - 10)))
+
+        t_sortie = font_sub.render("Sortie atteinte", True, (80, 210, 130))
+        self.screen.blit(t_sortie, t_sortie.get_rect(center=(self.largeur // 2, cy + 34)))
+
+        if timer is not None:
+            minutes  = int(timer) // 60
+            secondes = int(timer) % 60
+            centimes = int((timer % 1) * 100)
+            t_temps = font_sub.render(
+                f"Temps  {minutes:02d}:{secondes:02d}.{centimes:02d}", True, (200, 200, 200))
+            self.screen.blit(t_temps, t_temps.get_rect(center=(self.largeur // 2, cy + 82)))
+
+        pygame.draw.line(self.screen, (80, 130, 100),
+                         (self.largeur // 2 - 220, cy + 112),
+                         (self.largeur // 2 + 220, cy + 112), 1)
+
+        t_quit = font_small.render("ECHAP  quitter        R  rejouer", True, (130, 130, 130))
+        self.screen.blit(t_quit, t_quit.get_rect(center=(self.largeur // 2, cy + 136)))
+
     def dessiner_hud(self, oeufs, nb_total, carto):
-        font = pygame.font.SysFont("monospace", 26, bold=True)
-        restants   = sum(1 for o in oeufs if not o["collecte"])
-        surf_oeufs = font.render(f"Oeufs : {restants} / {nb_total}", True, (255, 230, 60))
-        self.screen.blit(surf_oeufs, (20, 16))
+        collectes = sum(1 for o in oeufs if o["collecte"])
+
+        JAUGE_X  = 20
+        JAUGE_Y  = 16
+        OEUF_W   = 22
+        OEUF_H   = 30
+        OEUF_GAP = 10
+        LABEL_W  = 80
+
+        font = pygame.font.SysFont("monospace", 18, bold=True)
+        surf_label = font.render("Oeufs :", True, (180, 180, 180))
+        self.screen.blit(surf_label, (JAUGE_X, JAUGE_Y + (OEUF_H - surf_label.get_height()) // 2))
+
+        ox = JAUGE_X + LABEL_W
+        for i in range(nb_total):
+            cx = ox + i * (OEUF_W + OEUF_GAP) + OEUF_W // 2
+            cy = JAUGE_Y + OEUF_H // 2
+            rect = pygame.Rect(cx - OEUF_W // 2, cy - OEUF_H // 2, OEUF_W, OEUF_H)
+            if i < collectes:
+                pygame.draw.ellipse(self.screen, (255, 220, 50), rect)
+                pygame.draw.ellipse(self.screen, (255, 255, 180), rect, 2)
+            else:
+                pygame.draw.ellipse(self.screen, (60, 65, 70), rect)
+                pygame.draw.ellipse(self.screen, (90, 95, 100), rect, 1)
 
         total       = carto.rows * carto.cols
         decouvertes = carto.nb_cellules_decouvertes()
         pct         = decouvertes * 100 // total
-        surf_carte  = font.render(f"Carte : {pct} %", True, (120, 200, 255))
-        self.screen.blit(surf_carte, (20 + surf_oeufs.get_width() + 40, 16))
+        font2 = pygame.font.SysFont("monospace", 18, bold=True)
+        surf_carte = font2.render(f"Carte : {pct} %", True, (120, 200, 255))
+        x_carte = ox + nb_total * (OEUF_W + OEUF_GAP) + 20
+        self.screen.blit(surf_carte, (x_carte, JAUGE_Y + (OEUF_H - surf_carte.get_height()) // 2))
 
     def afficher_pause(self):
         overlay = pygame.Surface((self.largeur, self.hauteur), pygame.SRCALPHA)
@@ -297,17 +427,28 @@ class VuePygame:
     def dessiner_etat_exploration(self, controleur):
         font = pygame.font.SysFont("monospace", 20, bold=True)
         etat = controleur.etat.upper()
-        couleur = (80, 200, 120) if etat == "EXPLORATION" else (255, 200, 50)
+        if etat == "EXPLORATION":
+            couleur = (80, 200, 120)
+        elif etat == "COLLECTE":
+            couleur = (255, 200, 50)
+        else:
+            couleur = (80, 180, 255)
         surf = font.render(f"Mode : {etat}", True, couleur)
         self.screen.blit(surf, (20, self.hauteur - 36))
 
-    def dessiner_cartographie(self, carto):
+    def dessiner_cartographie(self, carto, laby=None):
         taille_px = int(carto.cell * self.scale) + 1
         ep_mur    = max(5, int(self.scale * 0.18))
         COLOR_FOG   = (0, 0, 0)
         COLOR_CELL  = (42, 46, 50)
         COLOR_MUR   = (200, 185, 140)
         COLOR_MUR_B = (255, 240, 180)
+
+        rc_sortie   = tuple(laby.sortie["rc"])  if laby else None
+        cote_sortie = laby.sortie["cote"]       if laby else None
+        sortie_decouverte = (
+            laby is not None and carto.est_decouverte(rc_sortie[0], rc_sortie[1])
+        )
 
         for r in range(carto.rows):
             for c in range(carto.cols):
@@ -328,6 +469,13 @@ class VuePygame:
                     est_mur = hors_grille or (cle not in carto.passages)
                     if not est_mur:
                         continue
+
+                    if (sortie_decouverte
+                            and (r, c) == rc_sortie
+                            and hors_grille
+                            and cote == cote_sortie):
+                        continue
+
                     if cote == "haut":
                         mr = pygame.Rect(px, py, taille_px, ep_mur)
                     elif cote == "bas":
